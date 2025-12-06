@@ -1,65 +1,89 @@
-import Image from "next/image";
+import { getGames } from "@/lib/games";
+import GameCard from "@/components/GameCard";
+import SearchBar from "@/components/SearchBar";
+import CommunityCard from "@/components/CommunityCard";
+import { Community } from "@/types";
 
-export default function Home() {
+export default async function Home() {
+  const allGames = await getGames();
+  const trendingGames = allGames.slice(0, 8);
+
+  // Placeholder communities - replace with actual data later
+  const sampleCommunities: Community[] = [
+    {
+      id: "1",
+      gameId: allGames[0]?.id || "",
+      name: "Gaming Hub",
+      inviteUrl: "https://discord.gg/example",
+      category: "General",
+      language: "English",
+      onlineCount: 1247,
+      createdAt: new Date().toISOString(),
+    },
+    {
+      id: "2",
+      gameId: allGames[0]?.id || "",
+      name: "Pro Players",
+      inviteUrl: "https://discord.gg/example2",
+      category: "Competitive",
+      language: "English",
+      onlineCount: 892,
+      createdAt: new Date().toISOString(),
+    },
+    {
+      id: "3",
+      gameId: allGames[0]?.id || "",
+      name: "Casual Gaming",
+      inviteUrl: "https://discord.gg/example3",
+      category: "Casual",
+      language: "English",
+      onlineCount: 456,
+      createdAt: new Date().toISOString(),
+    },
+  ];
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+    <div className="py-8">
+      {/* Search Bar */}
+      <div className="mb-12">
+        <SearchBar />
+      </div>
+
+      {/* Your Games Section */}
+      <section className="mb-12">
+        <h2 className="text-2xl font-semibold text-white mb-4">Your Games</h2>
+        <div className="bg-[#0E0E0E] border border-white/10 rounded p-6 text-center">
+          <p className="text-white/60 text-sm">Log in to see your games</p>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
+      </section>
+
+      {/* Trending Games Section */}
+      <section className="mb-12">
+        <h2 className="text-2xl font-semibold text-white mb-4">Trending Games</h2>
+        {trendingGames.length === 0 ? (
+          <p className="text-white/60 text-sm">No games available.</p>
+        ) : (
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+            {trendingGames.map((game) => (
+              <GameCard key={game.id} game={game} />
+            ))}
+          </div>
+        )}
+      </section>
+
+      {/* Active Communities Now Section */}
+      <section>
+        <h2 className="text-2xl font-semibold text-white mb-4">Active Communities Now</h2>
+        {sampleCommunities.length === 0 ? (
+          <p className="text-white/60 text-sm">No active communities.</p>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {sampleCommunities.map((community) => (
+              <CommunityCard key={community.id} community={community} />
+            ))}
+          </div>
+        )}
+      </section>
     </div>
   );
 }
