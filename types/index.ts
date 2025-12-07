@@ -7,6 +7,7 @@ export interface Game {
   title: string;
   description: string;
   coverUrl: string;
+  heroUrl?: string | null;
   platforms: string[];
   genres: string[];
   tags: string[];
@@ -25,6 +26,12 @@ export interface Community {
   language: string;
   onlineCount: number;
   createdAt: string;
+  // Enhanced fields (optional for backward compatibility)
+  description?: string | null;
+  tags?: string[];
+  memberCount?: number;
+  region?: string | null;
+  voiceRequired?: boolean;
 }
 
 /**
@@ -77,5 +84,85 @@ export interface PlayGuide {
   toPlatform: string;
   steps: string;
   lastUpdated: string;
+  gameVersionId?: string | null;
+  platform?: string | null;
+  // Joined data
+  gameVersion?: GameVersion | null;
+}
+
+/**
+ * GameVersion model representing a game version (e.g., "Season 3", "Update 2.0")
+ */
+export interface GameVersion {
+  id: string;
+  gameId: string;
+  versionName: string;
+  createdBy: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/**
+ * Event model representing a "Looking for Group" style event
+ */
+export interface Event {
+  id: string;
+  gameId: string;
+  gameVersionId: string | null;
+  createdBy: string;
+  description: string | null;
+  tags: string[];
+  playersNeeded: number;
+  playersHave: number;
+  startDate: string;
+  startTime: string;
+  startDatetime: string;
+  language: string;
+  platform: string | null;
+  status: "active" | "full" | "cancelled" | "completed";
+  createdAt: string;
+  updatedAt: string;
+  // Joined data
+  gameVersion?: GameVersion | null;
+  creator?: {
+    id: string;
+    email?: string;
+    user_metadata?: {
+      username?: string;
+    };
+  };
+  participants?: Array<{
+    id: string;
+    userId: string;
+    joinedAt: string;
+  }>;
+}
+
+/**
+ * GamePlayGuide model representing a mini "How to Play Together" guide per game
+ */
+export interface GamePlayGuide {
+  id: string;
+  gameId: string;
+  content: string; // Markdown content
+  createdAt: string;
+  updatedAt: string;
+}
+
+/**
+ * GameTrait model representing a trait that can be associated with games
+ */
+export interface GameTrait {
+  slug: string;
+  label: string;
+  iconEmoji?: string | null;
+}
+
+/**
+ * GameGameTrait model representing the relationship between a game and a trait
+ */
+export interface GameGameTrait {
+  strength: number;
+  gameTrait: GameTrait;
 }
 

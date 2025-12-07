@@ -3,6 +3,7 @@
 interface Tab {
   key: string;
   label: string;
+  count?: number;
 }
 
 interface GameTabsProps {
@@ -28,6 +29,9 @@ export default function GameTabs({ tabs, activeTab, onTabChange }: GameTabsProps
               }`}
             >
               {tab.label}
+              {typeof tab.count === "number" && (
+                <span className="ml-2 text-white/40">({tab.count})</span>
+              )}
               {isActive && (
                 <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-white animate-in fade-in" />
               )}

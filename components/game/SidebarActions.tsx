@@ -1,119 +1,252 @@
+"use client";
+
+import { useState, useEffect } from "react";
 import Image from "next/image";
-import Link from "next/link";
-import { Game, Community } from "@/types";
+import { Game } from "@/types";
+import { Zap, Users, Clock, Plus } from "lucide-react";
 import AddToYourGamesButton from "@/components/AddToYourGamesButton";
+import LobbyModal from "./LobbyModal";
+import { getAvailablePlayersByGameClient } from "@/lib/players-client";
+import { createClientSupabaseClient } from "@/lib/supabase-client";
 
 interface SidebarActionsProps {
   game: Game;
-  communities: Community[];
+  communities: any[];
   playersCount: number;
+  initialIsInLibrary?: boolean;
+  hasUser?: boolean;
+  onEventCreateClick?: () => void;
+  onLobbyClick?: () => void; // Callback to show toast
 }
 
 export default function SidebarActions({
   game,
   communities,
   playersCount,
+  initialIsInLibrary = false,
+  hasUser = false,
+  onEventCreateClick,
+  onLobbyClick,
 }: SidebarActionsProps) {
+  const [activePlayerCount, setActivePlayerCount] = useState(0);
+  const [searchingPlayerCount, setSearchingPlayerCount] = useState(0);
+  const [timeRemaining, setTimeRemaining] = useState(15 * 60); // 15 minutes in seconds
+
   const coverUrl = (game as Game & { cover_url?: string }).cover_url || game.coverUrl;
-  const activeCommunities = communities.length;
-  const totalOnline = communities.reduce((sum, c) => {
-    const onlineCount = (c as Community & { online_count?: number }).online_count ?? c.onlineCount;
-    return sum + onlineCount;
-  }, 0);
+  const gameExtended = game as Game & {
+    cover_url?: string;
+    developer?: string | null;
+    publisher?: string | null;
+    release_date?: string | null;
+    release_year?: number | null;
+  };
+
+  const developer = gameExtended.developer || "TBA";
+  const publisher = gameExtended.publisher || "TBA";
+  const releaseDate = gameExtended.release_date || gameExtended.release_year?.toString() || "Coming Soon";
+  const platform = gameExtended.platforms?.[0] || "PC";
+
+  // Countdown timer that resets every 15 minutes
+  useEffect(() => {
+    // Set initial time to 15 minutes
+    setTimeRemaining(15 * 60);
+
+    // Update timer every second
+    const interval = setInterval(() => {
+      setTimeRemaining((prev) => {
+        if (prev <= 1) {
+          // Reset to 15 minutes when it reaches 0
+          return 15 * 60;
+        }
+        return prev - 1;
+      });
+    }, 1000); // Update every second
+
+    return () => clearInterval(interval);
+  }, []);
+
+  // Fetch player counts (active and searching) and refresh every 15 minutes
+  useEffect(() => {
+    const loadPlayerCounts = async () => {
+      try {
+        const players = await getAvailablePlayersByGameClient(game.id);
+        // Active = all players with status "online" or "looking"
+        const activeCount = players.length;
+        // Searching = only players with status "looking"
+        const searchingCount = players.filter(p => p.status === "looking").length;
+        setActivePlayerCount(activeCount);
+        setSearchingPlayerCount(searchingCount);
+      } catch (error) {
+        console.error("Error loading player count:", error);
+      }
+    };
+
+    // Load immediately
+    loadPlayerCounts();
+
+    // Refresh every 15 minutes (900000 ms)
+    const interval = setInterval(loadPlayerCounts, 15 * 60 * 1000);
+
+    return () => clearInterval(interval);
+  }, [game.id]);
+
+  // Reload player count when timer resets (reaches 0)
+  useEffect(() => {
+    if (timeRemaining === 15 * 60) {
+      // Timer just reset, reload player count
+      const loadPlayerCounts = async () => {
+        try {
+          const players = await getAvailablePlayersByGameClient(game.id);
+          const activeCount = players.length;
+          const searchingCount = players.filter(p => p.status === "looking").length;
+          setActivePlayerCount(activeCount);
+          setSearchingPlayerCount(searchingCount);
+        } catch (error) {
+          console.error("Error loading player count:", error);
+        }
+      };
+      loadPlayerCounts();
+    }
+  }, [timeRemaining, game.id]);
+
+  const handleLobbyClick = () => {
+    if (onLobbyClick) {
+      onLobbyClick();
+    }
+  };
+
+  const handleEventCreateClick = () => {
+    if (onEventCreateClick) {
+      onEventCreateClick();
+    }
+  };
+
+  const handleAddToLibrary = async () => {
+    if (!hasUser) {
+      // Redirect to login if not logged in
+      window.location.href = "/login";
+      return;
+    }
+
+    if (initialIsInLibrary) {
+      // Already in library, do nothing or show message
+      return;
+    }
+
+    // Use the same logic as AddToYourGamesButton
+    const supabase = createClientSupabaseClient();
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        window.location.href = "/login";
+        return;
+      }
+
+      const { error } = await supabase.from("user_games").insert({
+        user_id: user.id,
+        game_id: game.id,
+      });
+
+      if (error) {
+        console.error("Error adding game:", error);
+        alert("Failed to add game. Please try again.");
+      } else {
+        // Refresh the page to update the UI
+        window.location.reload();
+      }
+    } catch (error) {
+      console.error("Error adding game:", error);
+      alert("Failed to add game. Please try again.");
+    }
+  };
+
+  const formatCountdown = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
+  };
 
   return (
-    <div className="lg:sticky lg:top-20">
-      <div className="bg-[#0E0E0E] border border-white/10 rounded-lg p-6 space-y-6 shadow-lg">
-        {/* Game Cover */}
-        {coverUrl && (
-          <div className="relative aspect-[3/4] w-full rounded-lg overflow-hidden">
-            <Image
-              src={coverUrl}
-              alt={game.title}
-              fill
-              className="object-cover"
-              sizes="(max-width: 768px) 100vw, 30vw"
-            />
-          </div>
-        )}
+    <div className="space-y-4">
+      {/* Game Cover */}
+      {coverUrl && (
+        <div className="relative aspect-[8/12] w-full rounded-lg overflow-hidden">
+          <Image
+            src={coverUrl}
+            alt={game.title}
+            fill
+            className="object-cover"
+            sizes="(max-width: 768px) 100vw, 30vw"
+          />
+        </div>
+      )}
 
-        {/* Action Buttons */}
-        <div className="space-y-3">
-          <AddToYourGamesButton gameId={game.id} />
-          <button className="w-full bg-white/10 hover:bg-white/20 text-white px-6 py-3 rounded transition-colors text-sm font-medium">
-            Follow Game
-          </button>
+      {/* Player Count and Timer */}
+      <div className="flex items-center gap-2 text-sm">
+        <span className="text-white font-mono font-semibold">{formatCountdown(timeRemaining)}</span>
+        <span className="text-white/40">|</span>
+        <span className="text-white/60">Players searching</span>
+        <span className="text-white font-semibold">{searchingPlayerCount}</span>
+      </div>
+
+      {/* Primary Action Buttons */}
+      <div className="flex items-center gap-2">
+        <button
+          onClick={handleLobbyClick}
+          className="flex-1 h-[42px] px-4 bg-purple-600 hover:bg-purple-700 text-white rounded flex items-center justify-center gap-2 transition-colors shadow-lg font-medium"
+          title="Start Matchmaking"
+        >
+          <Zap className="w-5 h-5 fill-current" />
+          <span className="text-sm">Start Matchmaking</span>
+        </button>
+        <button
+          onClick={handleAddToLibrary}
+          className="h-[42px] w-[42px] bg-white/10 hover:bg-white/20 text-white rounded flex items-center justify-center transition-colors flex-shrink-0"
+          title="Add to Your Games"
+        >
+          <Plus className="w-5 h-5" />
+        </button>
+      </div>
+
+      {/* Game Details Section */}
+      <div className="space-y-3 pt-4 border-t border-white/10">
+        {/* Developer */}
+        <div className="flex items-start justify-between">
+          <span className="text-white/60 text-sm">Developer</span>
+          <span className="text-white text-sm text-right">{developer}</span>
         </div>
 
-        {/* Platform Selector */}
-        {game.platforms && game.platforms.length > 1 && (
-          <div>
-            <label className="block text-white/60 text-xs mb-2">Platform</label>
-            <select className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-white text-sm focus:outline-none focus:border-white/20">
-              {game.platforms.map((platform) => (
-                <option key={platform} value={platform} className="bg-[#0E0E0E]">
-                  {platform}
-                </option>
-              ))}
-            </select>
-          </div>
-        )}
-
-        {/* Social Stats */}
-        <div className="space-y-3 pt-4 border-t border-white/10">
-          {playersCount > 0 && (
-            <div className="flex items-center justify-between">
-              <span className="text-white/60 text-sm">Players Online</span>
-              <span className="text-white text-sm font-medium">{playersCount}</span>
-            </div>
-          )}
-          {activeCommunities > 0 && (
-            <div className="flex items-center justify-between">
-              <span className="text-white/60 text-sm">Active Communities</span>
-              <span className="text-white text-sm font-medium">{activeCommunities}</span>
-            </div>
-          )}
-          {totalOnline > 0 && (
-            <div className="flex items-center justify-between">
-              <span className="text-white/60 text-sm">Total Online</span>
-              <span className="text-white text-sm font-medium">{totalOnline.toLocaleString()}</span>
-            </div>
-          )}
+        {/* Publisher */}
+        <div className="flex items-start justify-between">
+          <span className="text-white/60 text-sm">Publisher</span>
+          <span className="text-white text-sm text-right">{publisher}</span>
         </div>
 
-        {/* CTA Buttons */}
-        <div className="space-y-2 pt-4 border-t border-white/10">
-          {communities.length > 0 && (
-            <a
-              href={communities[0].inviteUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="block w-full bg-white/10 hover:bg-white/20 text-white text-center px-6 py-3 rounded transition-colors text-sm font-medium"
-            >
-              Join Discord
-            </a>
-          )}
-          <button className="w-full bg-white/20 hover:bg-white/30 text-white px-6 py-3 rounded transition-colors text-sm font-medium">
-            Play Now
-          </button>
+        {/* Release Date */}
+        <div className="flex items-start justify-between">
+          <span className="text-white/60 text-sm">Release Date</span>
+          <span className="text-white text-sm text-right">{releaseDate}</span>
         </div>
 
-        {/* Metadata */}
-        <div className="pt-4 border-t border-white/10 space-y-2">
-          <div className="flex items-start justify-between">
-            <span className="text-white/60 text-xs">Release Date</span>
-            <span className="text-white text-xs text-right">Coming Soon</span>
-          </div>
-          <div className="flex items-start justify-between">
-            <span className="text-white/60 text-xs">Developer</span>
-            <span className="text-white text-xs text-right">TBA</span>
-          </div>
-          <div className="flex items-start justify-between">
-            <span className="text-white/60 text-xs">Publisher</span>
-            <span className="text-white text-xs text-right">TBA</span>
+        {/* Platform */}
+        <div className="flex items-start justify-between">
+          <span className="text-white/60 text-sm">Platform</span>
+          <div className="flex items-center gap-1">
+            {platform?.toLowerCase() === "pc" || platform === "Windows" ? (
+              <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 480 512">
+                <g>
+                  <path d="M0.175 256l-0.175-156.037 192-26.072v182.109zM224 69.241l255.936-37.241v224h-255.936zM479.999 288l-0.063 224-255.936-36.008v-187.992zM192 471.918l-191.844-26.297-0.010-157.621h191.854z"></path>
+                </g>
+              </svg>
+            ) : (
+              <span className="text-white text-sm">{platform}</span>
+            )}
           </div>
         </div>
       </div>
+
+      {/* Lobby Modal */}
+      <LobbyModal />
     </div>
   );
 }

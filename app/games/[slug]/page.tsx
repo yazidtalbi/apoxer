@@ -1,6 +1,8 @@
 import Link from "next/link";
-import { getGameBySlug, getCommunitiesByGame, getGuidesByGame, getPlayGuidesByGame, getSimilarGames } from "@/lib/games";
+import { getGameBySlug, getCommunitiesByGame, getGuidesByGame, getPlayGuidesByGame, getSimilarGames, getGamePlayGuide, getGameTraits } from "@/lib/games";
 import { getPlayersByGame } from "@/lib/players";
+import { getCurrentUser } from "@/lib/supabase-server";
+import { isGameInUserLibrary } from "@/lib/user-games";
 import GamePageClient from "@/components/game/GamePageClient";
 
 interface GamePageProps {
@@ -24,13 +26,26 @@ export default async function GamePage({ params }: GamePageProps) {
     );
   }
 
+  // Get current user and check if game is in library
+  const user = await getCurrentUser();
+  let isInLibrary = false;
+  if (user) {
+    try {
+      isInLibrary = await isGameInUserLibrary(user.id, game.id);
+    } catch (error) {
+      console.error("Error checking if game is in library:", error);
+    }
+  }
+
   // Fetch all data in parallel
-  const [communities, guides, playGuides, players, similarGames] = await Promise.all([
+  const [communities, guides, playGuides, players, similarGames, gamePlayGuide, gameTraits] = await Promise.all([
     getCommunitiesByGame(game.id),
     getGuidesByGame(game.id),
     getPlayGuidesByGame(game.id),
     getPlayersByGame(game.id),
     getSimilarGames(game.genres || [], game.id, 8),
+    getGamePlayGuide(game.id), // Fetch mini "How to Play Together" guide
+    getGameTraits(game.id, 4).catch(() => []), // Fetch game traits, return empty array on error
   ]);
 
   return (
@@ -41,6 +56,10 @@ export default async function GamePage({ params }: GamePageProps) {
       playGuides={playGuides}
       players={players}
       similarGames={similarGames}
+      gamePlayGuide={gamePlayGuide}
+      gameTraits={gameTraits}
+      initialIsInLibrary={isInLibrary}
+      hasUser={!!user}
     />
   );
 }

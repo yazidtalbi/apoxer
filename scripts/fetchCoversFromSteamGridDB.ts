@@ -213,19 +213,21 @@ async function fetchCoverForGame(game: { id: string; slug: string; title: string
  * Fetch games without cover URLs from Supabase
  */
 async function fetchGamesWithoutCovers(): Promise<Array<{ id: string; slug: string; title: string }>> {
-  // Fetch all games and filter in memory to handle null/empty cover_url
   const { data, error } = await supabase
     .from("games")
     .select("id, slug, title, cover_url")
-    .order("title", { ascending: true });
+    .order("title", { ascending: true })
+    .range(4000, 4999); // 👈 FETCH UP TO 5000 ROWS
 
   if (error) {
     throw new Error(`Failed to fetch games: ${error.message}`);
   }
 
-  // Filter games without cover URLs (null or empty string)
-  return (data || []).filter((game) => !game.cover_url || game.cover_url.trim() === "").map(({ cover_url, ...rest }) => rest);
+  return (data || [])
+    .filter((game) => !game.cover_url || game.cover_url.trim() === "")
+    .map(({ cover_url, ...rest }) => rest);
 }
+
 
 /**
  * Update game cover URL in Supabase
