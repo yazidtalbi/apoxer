@@ -1,18 +1,10 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useRef } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { Event } from "@/types";
-import { Clock, Users, ChevronLeft, ChevronRight } from "lucide-react";
-import Autoplay from "embla-carousel-autoplay";
-import {
-  Carousel,
-  CarouselContent,
-  CarouselItem,
-  CarouselNext,
-  CarouselPrevious,
-} from "@/components/ui/carousel";
+import { ChevronRight, ChevronLeft, TrendingUp } from "lucide-react";
 
 interface EventWithGame extends Event {
   game?: {
@@ -28,34 +20,87 @@ interface EventsCarouselProps {
   events: EventWithGame[];
 }
 
+// Placeholder avatar colors
+const AVATAR_COLORS = [
+  "bg-gradient-to-br from-purple-500 to-pink-500",
+  "bg-gradient-to-br from-blue-500 to-cyan-500",
+  "bg-gradient-to-br from-orange-500 to-red-500",
+  "bg-gradient-to-br from-green-500 to-emerald-500",
+  "bg-gradient-to-br from-yellow-500 to-orange-500",
+  "bg-gradient-to-br from-indigo-500 to-purple-500",
+];
+
 export default function EventsCarousel({ events }: EventsCarouselProps) {
-  const [isParticipating, setIsParticipating] = useState<Record<string, boolean>>({});
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(true);
+  const [isDragging, setIsDragging] = useState(false);
+  const [startX, setStartX] = useState(0);
+  const [scrollLeft, setScrollLeft] = useState(0);
+
+  const checkScrollability = () => {
+    if (!scrollContainerRef.current) return;
+    const { scrollLeft: currentScrollLeft, scrollWidth, clientWidth } = scrollContainerRef.current;
+    setScrollLeft(currentScrollLeft);
+    setCanScrollLeft(currentScrollLeft > 0);
+    setCanScrollRight(currentScrollLeft < scrollWidth - clientWidth - 10);
+  };
+
+  // Drag to scroll functionality
+  const handleMouseDown = (e: React.MouseEvent) => {
+    if (!scrollContainerRef.current) return;
+    setIsDragging(true);
+    setStartX(e.pageX - scrollContainerRef.current.offsetLeft);
+    setScrollLeft(scrollContainerRef.current.scrollLeft);
+    scrollContainerRef.current.style.cursor = 'grabbing';
+    scrollContainerRef.current.style.userSelect = 'none';
+  };
+
+  const handleMouseLeave = () => {
+    setIsDragging(false);
+    if (scrollContainerRef.current) {
+      scrollContainerRef.current.style.cursor = 'grab';
+      scrollContainerRef.current.style.userSelect = 'auto';
+    }
+  };
+
+  const handleMouseUp = () => {
+    setIsDragging(false);
+    if (scrollContainerRef.current) {
+      scrollContainerRef.current.style.cursor = 'grab';
+      scrollContainerRef.current.style.userSelect = 'auto';
+    }
+  };
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (!isDragging || !scrollContainerRef.current) return;
+    e.preventDefault();
+    const x = e.pageX - scrollContainerRef.current.offsetLeft;
+    const walk = (x - startX) * 2; // Scroll speed multiplier
+    scrollContainerRef.current.scrollLeft = scrollLeft - walk;
+  };
 
   useEffect(() => {
-    // Check if user is participating in events
-    const checkParticipation = async () => {
-      const { createClientSupabaseClient } = await import("@/lib/supabase-client");
-      const supabase = createClientSupabaseClient();
-      const { data: { user } } = await supabase.auth.getUser();
-      
-      if (!user) return;
-
-      const participation: Record<string, boolean> = {};
-      for (const event of events) {
-        const { data } = await supabase
-          .from("event_participants")
-          .select("id")
-          .eq("event_id", event.id)
-          .eq("user_id", user.id)
-          .maybeSingle();
-        
-        participation[event.id] = !!data;
-      }
-      setIsParticipating(participation);
-    };
-
-    checkParticipation();
+    checkScrollability();
+    const container = scrollContainerRef.current;
+    if (container) {
+      container.addEventListener("scroll", checkScrollability);
+      window.addEventListener("resize", checkScrollability);
+      return () => {
+        container.removeEventListener("scroll", checkScrollability);
+        window.removeEventListener("resize", checkScrollability);
+      };
+    }
   }, [events]);
+
+  const scroll = (direction: "left" | "right") => {
+    if (!scrollContainerRef.current) return;
+    const scrollAmount = 400;
+    scrollContainerRef.current.scrollBy({
+      left: direction === "right" ? scrollAmount : -scrollAmount,
+      behavior: "smooth",
+    });
+  };
 
   if (events.length === 0) {
     return null;
@@ -82,198 +127,206 @@ export default function EventsCarousel({ events }: EventsCarouselProps) {
     }
   };
 
-  const formatEventTime = (startDate: string, startTime: string) => {
-    try {
-      const date = new Date(`${startDate}T${startTime}`);
-      return date.toLocaleDateString("en-US", {
-        weekday: "long",
-        month: "short",
-        day: "numeric",
-        hour: "2-digit",
-        minute: "2-digit",
-      });
-    } catch {
-      return `${startDate} ${startTime}`;
-    }
+  // Generate placeholder avatars (always 3)
+  const getAvatars = () => {
+    return Array.from({ length: 3 }, (_, i) => ({
+      id: i,
+      color: AVATAR_COLORS[i % AVATAR_COLORS.length],
+      initial: String.fromCharCode(65 + (i % 26)), // A, B, C, etc.
+    }));
   };
-
-  const handleJoinEvent = async (eventId: string) => {
-    const { createClientSupabaseClient } = await import("@/lib/supabase-client");
-    const supabase = createClientSupabaseClient();
-    const { data: { user } } = await supabase.auth.getUser();
-
-    if (!user) {
-      window.location.href = "/login";
-      return;
-    }
-
-    try {
-      const { error } = await supabase.from("event_participants").insert({
-        event_id: eventId,
-        user_id: user.id,
-      });
-
-      if (error) {
-        console.error("Error joining event:", error);
-        alert("Failed to join event. Please try again.");
-      } else {
-        setIsParticipating((prev) => ({ ...prev, [eventId]: true }));
-        // Refresh to update player count
-        window.location.reload();
-      }
-    } catch (error) {
-      console.error("Error joining event:", error);
-      alert("Failed to join event. Please try again.");
-    }
-  };
-
-  const autoplayPlugin = useMemo(
-    () =>
-      Autoplay({
-        delay: 5000,
-        stopOnInteraction: false,
-        stopOnMouseEnter: true,
-      }),
-    []
-  );
 
   return (
-    <div className="relative w-full">
-      <Carousel
-        plugins={[autoplayPlugin]}
-        opts={{
-          align: "start",
-          loop: true,
-        }}
-        className="w-full"
-      >
-        <CarouselContent className="-ml-0">
-          {events.map((event) => {
-            const heroUrl = event.game?.hero_url || "";
+    <div className="w-full mb-12 relative">
+      {/* Gaming Background Pattern - Grid with rounded squares */}
+      <div className="absolute inset-0 opacity-[0.03] pointer-events-none overflow-hidden">
+        <div 
+          className="absolute inset-0 animate-scroll-right"
+          style={{
+            backgroundImage: `
+              radial-gradient(circle at 60px 60px, rgba(255,255,255,0.4) 5px, transparent 5px),
+              radial-gradient(circle at 140px 140px, rgba(255,255,255,0.3) 4px, transparent 4px),
+              radial-gradient(circle at 220px 60px, rgba(255,255,255,0.35) 4.5px, transparent 4.5px)
+            `,
+            backgroundSize: '160px 160px, 160px 160px, 160px 160px',
+            width: '200%',
+            animation: 'scrollRight 20s linear infinite',
+          }} 
+        />
+        {/* Grid pattern overlay */}
+        <div 
+          className="absolute inset-0 animate-scroll-right"
+          style={{
+            backgroundImage: `
+              repeating-linear-gradient(0deg, transparent, transparent 159px, rgba(255,255,255,0.08) 159px, rgba(255,255,255,0.08) 160px),
+              repeating-linear-gradient(90deg, transparent, transparent 159px, rgba(255,255,255,0.08) 159px, rgba(255,255,255,0.08) 160px)
+            `,
+            backgroundSize: '160px 160px',
+            width: '200%',
+            animation: 'scrollRight 20s linear infinite',
+          }} 
+        />
+      </div>
+
+      {/* Content */}
+      <div className="relative z-10">
+        {/* Header */}
+        <div className="flex items-center justify-center gap-2 mb-6">
+          <TrendingUp className="w-5 h-5 text-white/60" />
+          <h2 className="text-sm font-medium text-white/60 uppercase tracking-wider">
+            Trending Events
+          </h2>
+        </div>
+
+      {/* Carousel Container */}
+      <div className="relative">
+        {/* Left blur fade - only show when scrolled */}
+        {canScrollLeft && (
+          <div className="absolute left-0 top-0 bottom-4 w-20 bg-gradient-to-r from-[#1A1A1A] to-transparent z-20 pointer-events-none transition-opacity duration-300" />
+        )}
+        
+        {/* Right blur fade - only show when there's more content */}
+        {canScrollRight && (
+          <div className="absolute right-0 top-0 bottom-4 w-20 bg-gradient-to-l from-[#1A1A1A] to-transparent z-20 pointer-events-none transition-opacity duration-300" />
+        )}
+        
+        {/* Scrollable Content */}
+        <div
+          ref={scrollContainerRef}
+          className="flex gap-4 overflow-x-auto scrollbar-hide scroll-smooth pb-4 relative z-10 cursor-grab active:cursor-grabbing"
+          style={{
+            scrollbarWidth: "none",
+            msOverflowStyle: "none",
+          }}
+          onMouseDown={handleMouseDown}
+          onMouseLeave={handleMouseLeave}
+          onMouseUp={handleMouseUp}
+          onMouseMove={handleMouseMove}
+        >
+          {events.map((event, index) => {
             const gameTitle = event.game?.title || "Unknown Game";
             const gameSlug = event.game?.slug || "";
-            const isFull = event.playersHave >= event.playersNeeded;
-            const userIsParticipating = isParticipating[event.id];
-            
+            const coverUrl = event.game?.cover_url || event.game?.hero_url || null;
+            const avatars = getAvatars();
+            const duration = formatDuration(event.startDate, event.startTime);
+
             return (
-              <CarouselItem key={event.id} className="pl-0 basis-full">
-                <div className="relative h-96 md:h-[500px] w-full overflow-hidden rounded-lg">
-                  {/* Background Image */}
-                  {heroUrl && (
-                    <div className="absolute inset-0">
+              <Link
+                key={event.id}
+                href={gameSlug ? `/games/${gameSlug}?event=${event.id}` : "#"}
+                className="flex-shrink-0 w-[320px] h-[180px] rounded-xl overflow-hidden shadow-xl group select-none"
+                onClick={(e) => {
+                  if (isDragging) {
+                    e.preventDefault();
+                  }
+                }}
+              >
+                {/* Card with Cover Background */}
+                <div className="relative w-full h-full p-5 flex flex-col justify-between">
+                  {/* Background Image with Overlay */}
+                  {coverUrl && (
+                    <>
                       <Image
-                        src={heroUrl}
+                        src={coverUrl}
                         alt={gameTitle}
                         fill
-                        className="object-cover"
-                        sizes="100vw"
-                        priority
+                        className="object-cover object-top"
+                        sizes="320px"
                       />
-                      <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-black/50 to-black/80" />
-                    </div>
+                      <div className="absolute inset-0 bg-black/70" />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent" />
+                    </>
                   )}
-                  {!heroUrl && (
-                    <div className="absolute inset-0 bg-gradient-to-br from-purple-900/50 to-blue-900/50" />
+                  {!coverUrl && (
+                    <>
+                      <div className="absolute inset-0 bg-gradient-to-br from-purple-600 to-blue-700" />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent" />
+                    </>
                   )}
-
+                  
                   {/* Content */}
-                  <div className="relative h-full flex flex-col justify-end p-6 md:p-12">
-                    <div className="max-w-3xl">
-                      {/* Game Title */}
-                      {gameSlug && (
-                        <Link
-                          href={`/games/${gameSlug}`}
-                          className="text-white/80 hover:text-white text-sm font-medium mb-2 inline-block transition-colors"
-                        >
-                          {gameTitle}
-                        </Link>
-                      )}
+                  <div className="relative z-10 flex flex-col h-full justify-between">
+                    {/* Title Row */}
+                    <div className="flex items-start justify-between mb-2">
+                      <h3 className="text-white font-bold text-base leading-tight pr-2">
+                        #{gameTitle.slice(0, 20)}{gameTitle.length > 20 ? '...' : ''}
+                      </h3>
+                      <ChevronRight className="w-4 h-4 text-white/80 flex-shrink-0 group-hover:translate-x-1 transition-transform" />
+                    </div>
 
-                      {/* Event Title/Description */}
-                      <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold text-white mb-4">
-                        {event.description || `Join ${gameTitle} Event`}
-                      </h2>
+                    {/* Description */}
+                    <p className="text-white/90 text-sm mb-3 line-clamp-2">
+                      {event.description || `Join ${gameTitle} event starting in ${duration}`}
+                    </p>
 
-                      {/* Duration and Players Info */}
-                      <div className="flex flex-wrap items-center gap-6 mb-6">
-                        <div className="flex items-center gap-2 text-white/90">
-                          <Clock className="w-5 h-5" />
-                          <span className="font-medium">
-                            {formatDuration(event.startDate, event.startTime)}
-                          </span>
-                          <span className="text-white/60 text-sm ml-2">
-                            {formatEventTime(event.startDate, event.startTime)}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-2 text-white/90">
-                          <Users className="w-5 h-5" />
-                          <span className="font-medium">
-                            {event.playersHave}/{event.playersNeeded} players
-                          </span>
-                        </div>
-                        {event.platform && (
-                          <span className="bg-white/20 text-white px-3 py-1 rounded-full text-sm">
-                            {event.platform}
-                          </span>
-                        )}
+                    {/* Footer with Stats and Avatars */}
+                    <div className="flex items-end justify-between mt-auto">
+                      {/* Statistics */}
+                      <div className="flex flex-col gap-0.5">
+                        <span className="text-white font-semibold text-sm">
+                          {event.playersHave || 0} {event.playersHave === 1 ? "Player" : "Players"}
+                        </span>
+                        <span className="text-white/80 text-xs">
+                          {event.playersNeeded - (event.playersHave || 0)} {event.playersNeeded - (event.playersHave || 0) === 1 ? "slot left" : "slots left"}
+                        </span>
                       </div>
 
-                      {/* Tags */}
-                      {event.tags && event.tags.length > 0 && (
-                        <div className="flex flex-wrap gap-2 mb-6">
-                          {event.tags.slice(0, 3).map((tag, idx) => (
-                            <span
-                              key={idx}
-                              className="bg-white/20 border border-white/30 text-white text-xs px-3 py-1 rounded-full"
-                            >
-                              {tag}
-                            </span>
-                          ))}
-                        </div>
-                      )}
-
-                      {/* CTA Button */}
-                      <div>
-                        {userIsParticipating ? (
-                          <button
-                            disabled
-                            className="bg-green-600/80 text-white px-8 py-3 rounded-lg font-semibold text-lg disabled:cursor-not-allowed flex items-center gap-2"
+                      {/* Avatar Stack - Always 3 avatars */}
+                      <div className="flex -space-x-2">
+                        {avatars.map((avatar, i) => (
+                          <div
+                            key={avatar.id}
+                            className={`${avatar.color} w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-semibold border-2 border-white/30`}
+                            style={{ zIndex: avatars.length - i }}
                           >
-                            <svg
-                              className="w-5 h-5"
-                              fill="none"
-                              stroke="currentColor"
-                              viewBox="0 0 24 24"
-                            >
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth={2}
-                                d="M5 13l4 4L19 7"
-                              />
-                            </svg>
-                            I'm In
-                          </button>
-                        ) : (
-                          <button
-                            onClick={() => handleJoinEvent(event.id)}
-                            disabled={isFull}
-                            className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white px-8 py-3 rounded-lg font-semibold text-lg transition-colors"
-                          >
-                            {isFull ? "Event Full" : "Join Event"}
-                          </button>
-                        )}
+                            {avatar.initial}
+                          </div>
+                        ))}
                       </div>
                     </div>
                   </div>
                 </div>
-              </CarouselItem>
+              </Link>
             );
           })}
-        </CarouselContent>
-        <CarouselPrevious className="left-4 bg-white/10 hover:bg-white/20 border-white/20 text-white" />
-        <CarouselNext className="right-4 bg-white/10 hover:bg-white/20 border-white/20 text-white" />
-      </Carousel>
+        </div>
+
+        {/* Navigation Buttons */}
+        {canScrollLeft && (
+          <button
+            onClick={() => scroll("left")}
+            className="absolute left-0 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-sm border border-white/20 flex items-center justify-center text-white transition-all z-10"
+            aria-label="Scroll left"
+          >
+            <ChevronLeft className="w-5 h-5" />
+          </button>
+        )}
+        {canScrollRight && (
+          <button
+            onClick={() => scroll("right")}
+            className="absolute right-0 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-sm border border-white/20 flex items-center justify-center text-white transition-all z-10"
+            aria-label="Scroll right"
+          >
+            <ChevronRight className="w-5 h-5" />
+          </button>
+        )}
+        </div>
+      </div>
+
+      <style jsx>{`
+        .scrollbar-hide::-webkit-scrollbar {
+          display: none;
+        }
+        
+        @keyframes scrollRight {
+          0% {
+            transform: translateX(0);
+          }
+          100% {
+            transform: translateX(-50%);
+          }
+        }
+      `}</style>
     </div>
   );
 }

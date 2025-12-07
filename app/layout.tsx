@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
-import AppShell from "@/components/layout/AppShell";
+import AppShellWrapper from "@/components/layout/AppShellWrapper";
 import ServiceWorkerRegistration from "@/components/ServiceWorkerRegistration";
 import { LobbyProvider } from "@/contexts/LobbyContext";
 
@@ -43,7 +43,7 @@ export default function RootLayout({
       </head>
       <body className={`${inter.variable} antialiased h-full`}>
         <LobbyProvider>
-          <AppShell>{children}</AppShell>
+          <AppShellWrapper>{children}</AppShellWrapper>
           <ServiceWorkerRegistration />
         </LobbyProvider>
       </body>

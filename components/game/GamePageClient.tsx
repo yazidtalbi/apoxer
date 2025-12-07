@@ -19,6 +19,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { LayoutDashboard, Users, Gamepad2, Calendar, UserCircle, Clock } from "lucide-react";
 import { Game, GamePlayGuide, GameGameTrait } from "@/types";
 import GameTabs from "./GameTabs";
@@ -61,6 +62,9 @@ export default function GamePageClient({
 }: GamePageClientProps) {
   const [activeTab, setActiveTab] = useState("overview");
   const { setGame, setShowLobby, isLobbyModalOpen, setIsLobbyModalOpen } = useLobby();
+
+  // Get game cover URL for background
+  const coverUrl = (game as Game & { cover_url?: string }).cover_url || game.coverUrl;
 
   // Set game in context when component mounts (only if not already set)
   useEffect(() => {
@@ -122,10 +126,37 @@ export default function GamePageClient({
 
   return (
     <>
-      {/* Hero Section with Title and Right Sidebar */}
-      <div className="flex gap-6 mb-12">
+      {/* Hero Section with Blurred Cover Background - Spotify style */}
+      <div className="relative -mx-4 sm:-mx-6 lg:-mx-8 -mt-6 sm:-mt-8 mb-12 overflow-hidden">
+        {/* Blurred Cover Background */}
+        {coverUrl && (
+          <div className="absolute inset-0 top-0 h-[500px] z-0">
+            <div className="absolute inset-0 scale-125">
+              <Image
+                src={coverUrl}
+                alt={game.title}
+                fill
+                className="object-cover opacity-20"
+                style={{ filter: 'opacity(0.5) saturate(2)' }}  
+                sizes="100vw"
+                priority
+                unoptimized
+              />
+            </div>
+            {/* Fade overlay - matches page background with smooth transition */}
+            <div className="absolute inset-0 bg-gradient-to-b from-transparent via-[#1A1A1A]/50 to-[#1A1A1A]" />
+          </div>
+        )}
+        {/* Fallback gradient if no cover */}
+        {!coverUrl && (
+          <div className="absolute inset-0 h-[500px] z-0 bg-[#1A1A1A]" />
+        )}
+        
+        {/* Content */}
+        <div className="relative z-10 px-4 sm:px-6 lg:px-8 pb-12 top-8">
+          <div className="flex gap-6 items-end">
         {/* Left Column - Title and Stats */}
-        <div className="flex-1 min-w-0">
+        <div className="flex-1 min-w-0 overflow-hidden">
           {/* Breadcrumbs */}
           <nav className="text-xs mb-4">
             <div className="flex items-center gap-2 text-white/40 uppercase tracking-wide">
@@ -142,7 +173,7 @@ export default function GamePageClient({
           </nav>
 
           {/* Game Metadata - White rounded boxes */}
-          <div className="flex flex-wrap items-center gap-2 mb-6 mt-8">
+          <div className="flex flex-wrap items-center gap-2 mb-6">
             {/* Developer */}
             <div className="bg-white rounded-sm px-2 h-5 flex items-center justify-center py-0">
               <span className="text-xs text-black">{developer}</span>
@@ -193,7 +224,7 @@ export default function GamePageClient({
 
           {/* Title and Stats */}
           <div>
-            <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-white mb-6 max-w-3xl">
+            <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-white mb-6 break-words">
               {game.title}
             </h1>
             
@@ -212,37 +243,37 @@ export default function GamePageClient({
             </div>
             
             {/* Stats Cards */}
-            <div className="flex items-center border border-white/10 rounded-lg p-4 mb-6 max-w-lg">
+            {/* <div className="flex items-center border border-white/10 rounded-lg p-4 mb-6 max-w-lg">
               {/* Total Players */}
-              <div className="flex flex-col items-center flex-1 px-4 pl-0 border-r border-white/10">
+              {/* <div className="flex flex-col items-center flex-1 px-4 pl-0 border-r border-white/10">
                 <span className="text-3xl font-bold text-white leading-none mb-2">{totalPlayers}</span>
                 <span className="text-sm text-white/60 font-normal">Players</span>
-              </div>
+              </div> */}
               
               {/* Recent Players */}
-              <div className="flex flex-col items-center flex-1 px-4 border-r border-white/10">
+              {/* <div className="flex flex-col items-center flex-1 px-4 border-r border-white/10">
                 <span className="text-3xl font-bold text-white leading-none mb-2">{recentPlayersCount}</span>
                 <span className="text-sm text-white/60 font-normal">Recent</span>
-              </div>
+              </div> */}
               
               {/* Active Now */}
-              <div className="flex flex-col items-center flex-1 px-4 border-r border-white/10">
+              {/* <div className="flex flex-col items-center flex-1 px-4 border-r border-white/10">
                 <span className="text-3xl font-bold text-white leading-none mb-2">
                   {players.filter((p: any) => p.status === 'online' || p.status === 'looking').length}
                 </span>
                 <span className="text-sm text-white/60 font-normal">Active Now</span>
-              </div>
+              </div> */}
               
               {/* Guides Available */}
-              <div className="flex flex-col items-center flex-1 px-4 pr-0">
+              {/* <div className="flex flex-col items-center flex-1 px-4 pr-0">
                 <span className="text-3xl font-bold text-white leading-none mb-2">{guides.length + playGuides.length}</span>
                 <span className="text-sm text-white/60 font-normal">Guides</span>
-              </div>
-            </div>
+              </div> */}
+            {/* </div> */}
             
             {/* Game Traits */}
             {gameTraits && gameTraits.length > 0 && (
-              <div className="mb-6">
+              <div className="mb-6 overflow-hidden">
                 <div className="flex flex-wrap items-center gap-3">
                   {gameTraits.map((trait) => (
                     <div
@@ -258,7 +289,7 @@ export default function GamePageClient({
                         </div>
                       )}
                       {/* Text */}
-                      <span className="text-white text-xs font-semibold leading-tight">
+                      <span className="text-white text-xs font-semibold leading-tight whitespace-nowrap">
                         {trait.gameTrait.label}
                       </span>
                     </div>
@@ -299,6 +330,8 @@ export default function GamePageClient({
             horizontal={false}
           />
         </aside>
+          </div>
+        </div>
       </div>
 
       {/* Tabs Navigation - Full screen width */}

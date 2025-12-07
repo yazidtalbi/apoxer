@@ -18,7 +18,7 @@ export default function LobbyNavbarCompact({ onExpand }: LobbyNavbarCompactProps
 
   const coverUrl = game ? ((game as Game & { cover_url?: string }).cover_url || game.coverUrl) : null;
 
-  // Countdown timer that resets every 15 minutes
+  // Countdown timer
   useEffect(() => {
     if (!showLobby || !game) return;
 
@@ -46,12 +46,11 @@ export default function LobbyNavbarCompact({ onExpand }: LobbyNavbarCompactProps
         setPlayerCount(players.length);
       } catch (error) {
         console.error("Error loading player count:", error);
-        setPlayerCount(4); // Default to 4 for dummy players
       }
     };
 
     loadPlayerCount();
-    const interval = setInterval(loadPlayerCount, 15 * 60 * 1000);
+    const interval = setInterval(loadPlayerCount, 30000);
 
     return () => clearInterval(interval);
   }, [showLobby, game]);
@@ -67,39 +66,40 @@ export default function LobbyNavbarCompact({ onExpand }: LobbyNavbarCompactProps
   return (
     <button
       onClick={onExpand}
-      className="flex items-center gap-3 px-3 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg transition-colors group"
+      className="flex items-center gap-3 px-3 py-2.5 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg transition-colors group focus:outline-none focus:ring-2 focus:ring-white/20 active:bg-white/15"
+      aria-label={`Expand ${game.title} lobby. ${playerCount} players, ${formatCountdown(timeRemaining)} remaining`}
     >
       {/* Game Cover */}
       {coverUrl && (
-        <div className="relative w-10 h-12 rounded overflow-hidden flex-shrink-0">
+        <div className="relative w-10 h-12 rounded overflow-hidden flex-shrink-0 shadow-md">
           <Image
             src={coverUrl}
-            alt={game.title}
+            alt=""
             fill
-            className="object-cover"
+            className="object-cover object-top"
             sizes="40px"
+            aria-hidden="true"
           />
         </div>
       )}
 
-      {/* Game Title */}
+      {/* Game Info */}
       <div className="flex-1 min-w-0 text-left">
         <p className="text-white text-sm font-medium truncate">{game.title}</p>
         <div className="flex items-center gap-3 text-xs text-white/60 mt-0.5">
-          <div className="flex items-center gap-1.5">
-            <Users className="w-3.5 h-3.5 flex-shrink-0" />
-            <span>{playerCount}</span>
+          <div className="flex items-center gap-1.5" aria-label={`${playerCount} players`}>
+            <Users className="w-3.5 h-3.5 flex-shrink-0" aria-hidden="true" />
+            <span className="tabular-nums">{playerCount}</span>
           </div>
-          <div className="flex items-center gap-1.5">
-            <Clock className="w-3.5 h-3.5 flex-shrink-0" />
-            <span className="font-mono">{formatCountdown(timeRemaining)}</span>
+          <div className="flex items-center gap-1.5" aria-label={`${formatCountdown(timeRemaining)} remaining`}>
+            <Clock className="w-3.5 h-3.5 flex-shrink-0" aria-hidden="true" />
+            <span className="font-mono tabular-nums">{formatCountdown(timeRemaining)}</span>
           </div>
         </div>
       </div>
 
       {/* Expand Icon */}
-      <ChevronLeft className="w-4 h-4 text-white/40 group-hover:text-white/60 transition-colors flex-shrink-0" />
+      <ChevronLeft className="w-4 h-4 text-white/40 group-hover:text-white/60 transition-colors flex-shrink-0" aria-hidden="true" />
     </button>
   );
 }
-

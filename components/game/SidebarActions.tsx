@@ -159,11 +159,11 @@ export default function SidebarActions({
   // Horizontal layout (Spotify-style action row)
   if (horizontal) {
     return (
-      <>
+      <div className="flex items-center gap-3">
         {/* Primary Action Button - Large with text */}
         <button
           onClick={handleLobbyClick}
-          className="h-14 px-6 bg-purple-600 hover:bg-purple-700 text-white rounded-full flex items-center justify-center gap-2.5 transition-all hover:scale-105 shadow-lg font-semibold text-sm"
+          className="h-12 px-5 bg-purple-600 hover:bg-purple-700 text-white rounded-full flex items-center justify-center gap-2.5 transition-all hover:scale-105 shadow-lg font-semibold text-sm"
           title="Start Matchmaking"
         >
           <Zap className="w-5 h-5 fill-current" />
@@ -173,7 +173,7 @@ export default function SidebarActions({
         {/* Secondary Actions */}
         <button
           onClick={handleAddToLibrary}
-          className="h-10 w-10 bg-transparent hover:bg-white/10 text-white rounded-full flex items-center justify-center transition-colors border border-white/20 hover:border-white/40"
+          className="h-12 w-12 bg-transparent hover:bg-white/10 text-white rounded-full flex items-center justify-center transition-colors border border-white/20 hover:border-white/40"
           title="Add to Your Games"
         >
           <Plus className="w-5 h-5" />
@@ -181,7 +181,7 @@ export default function SidebarActions({
 
         {/* Lobby Modal */}
         <LobbyModal />
-      </>
+      </div>
     );
   }
 

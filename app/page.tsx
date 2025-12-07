@@ -1,10 +1,9 @@
-import { getGames, getTrendingCommunities, getPopularPlayGuides, getRecentlyAddedGames, getCrossplayGames, getMostSearchedGames, getGamesWithLowUsersSearching } from "@/lib/games";
+import { getGames, getTrendingCommunities, getPopularPlayGuides, getRecentlyAddedGames, getMostSearchedGames } from "@/lib/games";
 import { getUpcomingEvents } from "@/lib/events";
 import { getCurrentUser } from "@/lib/supabase-server";
 import { getUserGames } from "@/lib/user-games";
 import { Game } from "@/types";
 import GameCard from "@/components/GameCard";
-import GameCardWithPlayers from "@/components/GameCardWithPlayers";
 import CommunityCard from "@/components/CommunityCard";
 import HorizontalScroller from "@/components/HorizontalScroller";
 import HeroBanner from "@/components/HeroBanner";
@@ -13,6 +12,7 @@ import EventCard from "@/components/EventCard";
 import EventsCarousel from "@/components/EventsCarousel";
 import VerticalListSection from "@/components/VerticalListSection";
 import Footer from "@/components/Footer";
+import MatchmakingHero from "@/components/MatchmakingHero";
 
 export default async function Home() {
   // Fetch all data in parallel
@@ -22,19 +22,15 @@ export default async function Home() {
     trendingCommunities,
     popularGuides,
     recentlyAddedGames,
-    crossplayGames,
     mostSearchedGames,
-    lowUsersGames,
     user,
   ] = await Promise.all([
     getGames({ limit: 50 }),
-    getUpcomingEvents(4),
+    getUpcomingEvents(12),
     getTrendingCommunities(12).catch(() => []),
     getPopularPlayGuides(12).catch(() => []),
     getRecentlyAddedGames(12).catch(() => []),
-    getCrossplayGames(12).catch(() => []),
     getMostSearchedGames(12).catch(() => []),
-    getGamesWithLowUsersSearching(12).catch(() => []),
     getCurrentUser(),
   ]);
 
@@ -59,12 +55,30 @@ export default async function Home() {
 
   return (
     <div className="min-h-screen">
+      {/* Quick Matchmaker Hero */}
+      <MatchmakingHero featuredGames={mostSearchedGames.slice(0, 6)} />
+
       {/* Events Carousel - Always show at top */}
       {upcomingEvents.length > 0 && (
         <div className="mb-12">
           <EventsCarousel events={upcomingEvents} />
         </div>
       )}
+
+      {/* Trending Games Rail */}
+      <div className="mb-12">
+        <HorizontalScroller title="Trending Games" showArrows={mostSearchedGames.length > 6}>
+          {mostSearchedGames.length > 0 ? (
+            mostSearchedGames.map((game) => (
+              <div key={game.id} className="flex-shrink-0">
+                <GameCard game={game} />
+              </div>
+            ))
+          ) : (
+            <p className="text-white/60 text-sm">No trending games available.</p>
+          )}
+        </HorizontalScroller>
+      </div>
 
       <div className="w-full py-8">
         {/* Your Games Section */}
@@ -92,21 +106,6 @@ export default async function Home() {
           </HorizontalScroller>
         </section>
 
-
-        {/* Most Searched Right Now - Horizontal Rail */}
-        <section className="mb-16">
-          <HorizontalScroller title="Most Searched Right Now" showArrows={mostSearchedGames.length > 6}>
-            {mostSearchedGames.length > 0 ? (
-              mostSearchedGames.map((game) => (
-                <div key={game.id} className="flex-shrink-0">
-                  <GameCardWithPlayers game={game} />
-                </div>
-              ))
-            ) : (
-              <p className="text-white/60 text-sm">No games with active searches.</p>
-            )}
-          </HorizontalScroller>
-        </section>
 
         {/* Three Column Vertical Lists - Epic Games Style */}
         <section className="mb-16">
@@ -146,23 +145,6 @@ export default async function Home() {
               }
             />
 
-            {/* Crossplay-Friendly Games */}
-            <VerticalListSection
-              title="Crossplay-Friendly Games"
-              href="/games"
-              items={
-                crossplayGames.length > 0
-                  ? crossplayGames.slice(0, 5).map((game) => ({
-                      id: game.id,
-                      title: game.title,
-                      thumbnail: (game as Game & { cover_url?: string }).cover_url || game.coverUrl,
-                      subtitle: game.platforms?.slice(0, 3).join(", ") || "",
-                      badge: `${game.platforms?.length || 0} platforms`,
-                      href: `/games/${game.slug}`,
-                    }))
-                  : []
-              }
-            />
           </div>
         </section>
 
@@ -194,33 +176,6 @@ export default async function Home() {
           </section>
         )}
 
-        {/* Games with Very Low Users Searching */}
-        <section className="mb-16">
-          <HorizontalScroller title="Games with Very Low Users Searching" showArrows={lowUsersGames.length > 6}>
-            {lowUsersGames.length > 0 ? (
-              lowUsersGames.map((game) => (
-                <div key={game.id} className="flex-shrink-0">
-                  <GameCardWithPlayers game={game} />
-                </div>
-              ))
-            ) : (
-              <p className="text-white/60 text-sm">No games with low user searches.</p>
-            )}
-          </HorizontalScroller>
-        </section>
-
-        {/* Crossplay-Friendly Games Section */}
-        {crossplayGames.length > 0 && (
-          <section className="mb-16">
-            <HorizontalScroller title="Crossplay-Friendly Games" showArrows={crossplayGames.length > 6}>
-              {crossplayGames.map((game) => (
-                <div key={game.id} className="flex-shrink-0">
-                  <GameCard game={game} />
-                </div>
-              ))}
-            </HorizontalScroller>
-          </section>
-        )}
       </div>
 
       {/* Footer */}

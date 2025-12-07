@@ -18,7 +18,7 @@ export default function LobbySidebarCompact({ onExpand }: LobbySidebarCompactPro
 
   const coverUrl = game ? ((game as Game & { cover_url?: string }).cover_url || game.coverUrl) : null;
 
-  // Countdown timer that resets every 15 minutes
+  // Countdown timer
   useEffect(() => {
     if (!showLobby || !game) return;
 
@@ -36,7 +36,7 @@ export default function LobbySidebarCompact({ onExpand }: LobbySidebarCompactPro
     return () => clearInterval(interval);
   }, [showLobby, game]);
 
-  // Fetch player count
+  // Fetch player count (optimized: every 30 seconds)
   useEffect(() => {
     if (!showLobby || !game) return;
 
@@ -46,12 +46,11 @@ export default function LobbySidebarCompact({ onExpand }: LobbySidebarCompactPro
         setPlayerCount(players.length);
       } catch (error) {
         console.error("Error loading player count:", error);
-        setPlayerCount(4); // Default to 4 for dummy players
       }
     };
 
     loadPlayerCount();
-    const interval = setInterval(loadPlayerCount, 15 * 60 * 1000);
+    const interval = setInterval(loadPlayerCount, 30000); // 30 seconds for compact view
 
     return () => clearInterval(interval);
   }, [showLobby, game]);
@@ -67,15 +66,16 @@ export default function LobbySidebarCompact({ onExpand }: LobbySidebarCompactPro
   return (
     <button
       onClick={onExpand}
-      className="w-full px-3 py-4 space-y-3 hover:bg-white/5 rounded-lg transition-colors"
-      title="Click to expand lobby"
+      className="w-full px-3 py-4 space-y-3 hover:bg-white/5 rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-white/20 active:bg-white/10"
+      title={`Expand ${game.title} lobby - ${playerCount} players, ${formatCountdown(timeRemaining)} remaining`}
+      aria-label={`Active matchmaking: ${game.title}. ${playerCount} players available. Time remaining: ${formatCountdown(timeRemaining)}. Click to expand.`}
     >
       {/* Game Cover Image */}
       {coverUrl && (
-        <div className="relative w-full aspect-[3/4] rounded overflow-hidden">
+        <div className="relative w-full aspect-[3/4] rounded-lg overflow-hidden shadow-md">
           <Image
             src={coverUrl}
-            alt={game.title}
+            alt={`${game.title} cover`}
             fill
             className="object-cover"
             sizes="64px"
@@ -83,22 +83,20 @@ export default function LobbySidebarCompact({ onExpand }: LobbySidebarCompactPro
         </div>
       )}
 
-      {/* Player Count */}
-      <div className="flex flex-col items-center gap-1">
-        <div className="flex items-center gap-1.5 text-white/60">
-          <Users className="w-3.5 h-3.5 flex-shrink-0" />
-          <span className="text-xs">{playerCount}</span>
+      {/* Stats */}
+      <div className="flex flex-col gap-2">
+        {/* Player Count */}
+        <div className="flex items-center justify-center gap-1.5 text-white/70">
+          <Users className="w-3.5 h-3.5 flex-shrink-0" aria-hidden="true" />
+          <span className="text-xs font-medium tabular-nums">{playerCount}</span>
         </div>
-      </div>
 
-      {/* Timer */}
-      <div className="flex flex-col items-center gap-1">
-        <div className="flex items-center gap-1.5 text-white/60">
-          <Clock className="w-3.5 h-3.5 flex-shrink-0" />
-          <span className="text-xs font-mono">{formatCountdown(timeRemaining)}</span>
+        {/* Timer */}
+        <div className="flex items-center justify-center gap-1.5 text-white/70">
+          <Clock className="w-3.5 h-3.5 flex-shrink-0" aria-hidden="true" />
+          <span className="text-xs font-mono tabular-nums">{formatCountdown(timeRemaining)}</span>
         </div>
       </div>
     </button>
   );
 }
-

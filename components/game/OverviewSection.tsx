@@ -8,6 +8,7 @@ import PlayerCard from "@/components/PlayerCard";
 import AddToYourGamesButton from "@/components/AddToYourGamesButton";
 import { getEventsByGameClient } from "@/lib/events-client";
 import { Calendar, Clock, Users, Users2, Gamepad2, Plus, ArrowRight } from "lucide-react";
+import MatchmakingActivityChart from "./MatchmakingActivityChart";
 
 interface OverviewSectionProps {
   game: Game;
@@ -108,6 +109,11 @@ export default function OverviewSection({
 
   return (
     <div className="space-y-8">
+      {/* Matchmaking Activity Chart */}
+      <section>
+        <MatchmakingActivityChart gameId={game.id} />
+      </section>
+
       {/* Latest Communities */}
       <section>
         <div className="flex items-center justify-between mb-4">

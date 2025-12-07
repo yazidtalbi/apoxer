@@ -2,21 +2,31 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { Clock, Gamepad2, Plus, Zap } from "lucide-react";
+import { Clock, Gamepad2, Plus, Zap, Calendar } from "lucide-react";
 
 interface Activity {
   id: string;
-  type: "game_added" | "matchmaking_started" | "status_updated";
+  type: "game_added" | "matchmaking_started" | "event_participated";
   user: {
     id: string;
     username: string;
-    avatarUrl?: string;
+    displayName: string;
+    avatarUrl?: string | null;
   };
   game?: {
     id: string;
     title: string;
     slug: string;
-    coverUrl: string;
+    coverUrl: string | null;
+  };
+  event?: {
+    id: string;
+    title?: string;
+    game: {
+      id: string;
+      title: string;
+      slug: string;
+    };
   };
   timestamp: string;
   platform?: string;
@@ -33,7 +43,7 @@ export default function ActivityFeedItem({ activity }: ActivityFeedItemProps) {
         return <Plus className="w-4 h-4 text-green-400" />;
       case "matchmaking_started":
         return <Zap className="w-4 h-4 text-purple-400" />;
-      case "status_updated":
+      case "event_participated":
         return <Gamepad2 className="w-4 h-4 text-blue-400" />;
       default:
         return null;
@@ -46,8 +56,8 @@ export default function ActivityFeedItem({ activity }: ActivityFeedItemProps) {
         return "added a game";
       case "matchmaking_started":
         return "started matchmaking";
-      case "status_updated":
-        return "updated their status";
+      case "event_participated":
+        return "is participating in an event for";
       default:
         return "did something";
     }
@@ -97,10 +107,21 @@ export default function ActivityFeedItem({ activity }: ActivityFeedItemProps) {
                   href={`/profile/${activity.user.username}`}
                   className="font-semibold hover:text-white/80 transition-colors"
                 >
-                  {activity.user.username}
+                  {activity.user.displayName || activity.user.username}
                 </Link>
                 {" "}
                 <span className="text-white/60">{getActivityText()}</span>
+                {activity.event && (
+                  <>
+                    {" "}
+                    <Link
+                      href={`/games/${activity.event.game.slug}`}
+                      className="font-medium text-white hover:text-white/80 transition-colors"
+                    >
+                      {activity.event.game.title}
+                    </Link>
+                  </>
+                )}
                 {activity.game && (
                   <>
                     {" "}
@@ -126,18 +147,24 @@ export default function ActivityFeedItem({ activity }: ActivityFeedItemProps) {
             <div className="flex-shrink-0">{getActivityIcon()}</div>
 
             {/* Game Cover (if available) */}
-            {activity.game?.coverUrl && (
+            {(activity.game?.coverUrl || activity.event?.game) && (
               <Link
-                href={`/games/${activity.game.slug}`}
+                href={`/games/${activity.game?.slug || activity.event?.game.slug}`}
                 className="flex-shrink-0 relative w-16 h-20 rounded overflow-hidden hover:opacity-80 transition-opacity"
               >
-                <Image
-                  src={activity.game.coverUrl}
-                  alt={activity.game.title}
-                  fill
-                  className="object-cover"
-                  sizes="64px"
-                />
+                {activity.game?.coverUrl ? (
+                  <Image
+                    src={activity.game.coverUrl}
+                    alt={activity.game.title}
+                    fill
+                    className="object-cover"
+                    sizes="64px"
+                  />
+                ) : (
+                  <div className="w-full h-full bg-white/10 flex items-center justify-center">
+                    <Gamepad2 className="w-6 h-6 text-white/40" />
+                  </div>
+                )}
               </Link>
             )}
           </div>

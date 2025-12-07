@@ -32,10 +32,10 @@ dotenv.config({ path: ".env.local" });
 // ---------- CONFIG ----------
 const STEAMGRIDDB_API_BASE = "https://www.steamgriddb.com/api/v2";
 const BATCH_SIZE = 25;
-const RATE_LIMIT_DELAY_MS = 350; // Delay between API requests
+const RATE_LIMIT_DELAY_MS = 0; // Delay between API requests
 
 // Control which rows you process (by index in the table)
-const RANGE_START = 3000;      // change this if you want to process a later chunk
+const RANGE_START = 15000;      // change this if you want to process a later chunk
 const RANGE_END = 49999;     // inclusive index (=> up to 5000 rows)
 // ----------------------------
 
