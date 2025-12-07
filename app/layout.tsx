@@ -11,7 +11,7 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "saGame Directory",
+  title: "Game Directory",
   description: "Dark-mode game directory app",
   manifest: "/manifest.json",
   themeColor: "#0E0E0E",

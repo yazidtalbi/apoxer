@@ -17,6 +17,7 @@ interface SidebarActionsProps {
   hasUser?: boolean;
   onEventCreateClick?: () => void;
   onLobbyClick?: () => void; // Callback to show toast
+  horizontal?: boolean; // If true, render as horizontal action row
 }
 
 export default function SidebarActions({
@@ -27,24 +28,13 @@ export default function SidebarActions({
   hasUser = false,
   onEventCreateClick,
   onLobbyClick,
+  horizontal = false,
 }: SidebarActionsProps) {
   const [activePlayerCount, setActivePlayerCount] = useState(0);
   const [searchingPlayerCount, setSearchingPlayerCount] = useState(0);
   const [timeRemaining, setTimeRemaining] = useState(15 * 60); // 15 minutes in seconds
 
   const coverUrl = (game as Game & { cover_url?: string }).cover_url || game.coverUrl;
-  const gameExtended = game as Game & {
-    cover_url?: string;
-    developer?: string | null;
-    publisher?: string | null;
-    release_date?: string | null;
-    release_year?: number | null;
-  };
-
-  const developer = gameExtended.developer || "TBA";
-  const publisher = gameExtended.publisher || "TBA";
-  const releaseDate = gameExtended.release_date || gameExtended.release_year?.toString() || "Coming Soon";
-  const platform = gameExtended.platforms?.[0] || "PC";
 
   // Countdown timer that resets every 15 minutes
   useEffect(() => {
@@ -166,8 +156,38 @@ export default function SidebarActions({
     return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
   };
 
+  // Horizontal layout (Spotify-style action row)
+  if (horizontal) {
+    return (
+      <>
+        {/* Primary Action Button - Large with text */}
+        <button
+          onClick={handleLobbyClick}
+          className="h-14 px-6 bg-purple-600 hover:bg-purple-700 text-white rounded-full flex items-center justify-center gap-2.5 transition-all hover:scale-105 shadow-lg font-semibold text-sm"
+          title="Start Matchmaking"
+        >
+          <Zap className="w-5 h-5 fill-current" />
+          <span>Start Matchmaking</span>
+        </button>
+        
+        {/* Secondary Actions */}
+        <button
+          onClick={handleAddToLibrary}
+          className="h-10 w-10 bg-transparent hover:bg-white/10 text-white rounded-full flex items-center justify-center transition-colors border border-white/20 hover:border-white/40"
+          title="Add to Your Games"
+        >
+          <Plus className="w-5 h-5" />
+        </button>
+
+        {/* Lobby Modal */}
+        <LobbyModal />
+      </>
+    );
+  }
+
+  // Vertical sidebar layout (original)
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       {/* Game Cover */}
       {coverUrl && (
         <div className="relative aspect-[8/12] w-full rounded-lg overflow-hidden">
@@ -175,79 +195,14 @@ export default function SidebarActions({
             src={coverUrl}
             alt={game.title}
             fill
-            className="object-cover"
-            sizes="(max-width: 768px) 100vw, 30vw"
+            className="object-cover object-top"
+            sizes="320px"
           />
         </div>
       )}
-
-      {/* Player Count and Timer */}
-      <div className="flex items-center gap-2 text-sm">
-        <span className="text-white font-mono font-semibold">{formatCountdown(timeRemaining)}</span>
-        <span className="text-white/40">|</span>
-        <span className="text-white/60">Players searching</span>
-        <span className="text-white font-semibold">{searchingPlayerCount}</span>
-      </div>
-
-      {/* Primary Action Buttons */}
-      <div className="flex items-center gap-2">
-        <button
-          onClick={handleLobbyClick}
-          className="flex-1 h-[42px] px-4 bg-purple-600 hover:bg-purple-700 text-white rounded flex items-center justify-center gap-2 transition-colors shadow-lg font-medium"
-          title="Start Matchmaking"
-        >
-          <Zap className="w-5 h-5 fill-current" />
-          <span className="text-sm">Start Matchmaking</span>
-        </button>
-        <button
-          onClick={handleAddToLibrary}
-          className="h-[42px] w-[42px] bg-white/10 hover:bg-white/20 text-white rounded flex items-center justify-center transition-colors flex-shrink-0"
-          title="Add to Your Games"
-        >
-          <Plus className="w-5 h-5" />
-        </button>
-      </div>
-
-      {/* Game Details Section */}
-      <div className="space-y-3 pt-4 border-t border-white/10">
-        {/* Developer */}
-        <div className="flex items-start justify-between">
-          <span className="text-white/60 text-sm">Developer</span>
-          <span className="text-white text-sm text-right">{developer}</span>
-        </div>
-
-        {/* Publisher */}
-        <div className="flex items-start justify-between">
-          <span className="text-white/60 text-sm">Publisher</span>
-          <span className="text-white text-sm text-right">{publisher}</span>
-        </div>
-
-        {/* Release Date */}
-        <div className="flex items-start justify-between">
-          <span className="text-white/60 text-sm">Release Date</span>
-          <span className="text-white text-sm text-right">{releaseDate}</span>
-        </div>
-
-        {/* Platform */}
-        <div className="flex items-start justify-between">
-          <span className="text-white/60 text-sm">Platform</span>
-          <div className="flex items-center gap-1">
-            {platform?.toLowerCase() === "pc" || platform === "Windows" ? (
-              <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 480 512">
-                <g>
-                  <path d="M0.175 256l-0.175-156.037 192-26.072v182.109zM224 69.241l255.936-37.241v224h-255.936zM479.999 288l-0.063 224-255.936-36.008v-187.992zM192 471.918l-191.844-26.297-0.010-157.621h191.854z"></path>
-                </g>
-              </svg>
-            ) : (
-              <span className="text-white text-sm">{platform}</span>
-            )}
-          </div>
-        </div>
-      </div>
 
       {/* Lobby Modal */}
       <LobbyModal />
     </div>
   );
 }
-

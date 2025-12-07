@@ -1,71 +1,67 @@
 /**
  * SteamGridDB Cover Fetcher Script
- * 
+ *
  * This script fetches game cover images from SteamGridDB API and updates
  * the Supabase games table with cover URLs.
- * 
+ *
+ * It:
+ *  - Fetches a range of games from Supabase
+ *  - For each game:
+ *      - If it already has cover_url => skip
+ *      - Otherwise => fetch from SteamGridDB and update cover_url
+ *
  * SETUP:
- * 1. Create a .env.local file in the project root with:
+ * 1. .env.local:
  *    STEAMGRIDDB_API_KEY=your_api_key_here
- *    SUPABASE_URL=your_supabase_url (optional, falls back to NEXT_PUBLIC_SUPABASE_URL)
- *    SUPABASE_ANON_KEY=your_anon_key (optional, falls back to NEXT_PUBLIC_SUPABASE_ANON_KEY)
- * 
- *    Or use NEXT_PUBLIC_ prefixed variables:
- *    NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
- *    NEXT_PUBLIC_SUPABASE_ANON_KEY=your_anon_key
- * 
- *    Get your SteamGridDB API key from: https://www.steamgriddb.com/profile/preferences/api
- * 
- * 2. Install dependencies (if not already installed):
+ *    SUPABASE_URL=your_supabase_url (or NEXT_PUBLIC_SUPABASE_URL)
+ *    SUPABASE_ANON_KEY=your_anon_key (or NEXT_PUBLIC_SUPABASE_ANON_KEY)
+ *
+ * 2. Install dependencies:
  *    npm install @supabase/supabase-js dotenv
- * 
- *    For running TypeScript directly, install one of:
- *    npm install -D tsx        (recommended, faster)
- *    OR
- *    npm install -D ts-node   (alternative)
- * 
- * 3. Run the script:
- *    Using tsx (recommended):
+ *
+ * 3. Run:
  *    npx tsx scripts/fetchCoversFromSteamGridDB.ts
- * 
- *    Using ts-node:
- *    npx ts-node scripts/fetchCoversFromSteamGridDB.ts
- * 
- *    Or compile and run:
- *    npx tsc scripts/fetchCoversFromSteamGridDB.ts --outDir dist --esModuleInterop --module commonjs --target es2020
- *    node dist/scripts/fetchCoversFromSteamGridDB.js
- * 
- * NOTE: This script is safe to run multiple times - it only processes games
- * that don't have a cover_url set.
  */
 
-// Load environment variables from .env.local
 import dotenv from "dotenv";
 import { createClient } from "@supabase/supabase-js";
 
 // Explicitly load .env.local file
 dotenv.config({ path: ".env.local" });
 
-// Configuration
+// ---------- CONFIG ----------
 const STEAMGRIDDB_API_BASE = "https://www.steamgriddb.com/api/v2";
 const BATCH_SIZE = 25;
 const RATE_LIMIT_DELAY_MS = 350; // Delay between API requests
 
+// Control which rows you process (by index in the table)
+const RANGE_START = 3000;      // change this if you want to process a later chunk
+const RANGE_END = 49999;     // inclusive index (=> up to 5000 rows)
+// ----------------------------
+
 // Environment variables with fallbacks (NEXT_PUBLIC_* variables as fallback)
-const SUPABASE_URL = process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL;
-const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+const SUPABASE_URL =
+  process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL;
+const SUPABASE_ANON_KEY =
+  process.env.SUPABASE_ANON_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 const STEAMGRIDDB_API_KEY = process.env.STEAMGRIDDB_API_KEY;
 
 // Validate required environment variables with clear error messages
 if (!STEAMGRIDDB_API_KEY) {
   console.error("\n❌ Missing STEAMGRIDDB_API_KEY. Set it in .env.local.");
-  console.error("   Get your API key from https://www.steamgriddb.com/profile/preferences/api\n");
+  console.error(
+    "   Get your API key from https://www.steamgriddb.com/profile/preferences/api\n"
+  );
   process.exit(1);
 }
 
 if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
-  console.error("\n❌ Missing Supabase credentials. Add SUPABASE_URL and SUPABASE_ANON_KEY");
-  console.error("   or NEXT_PUBLIC_SUPABASE_URL / NEXT_PUBLIC_SUPABASE_ANON_KEY in .env.local\n");
+  console.error(
+    "\n❌ Missing Supabase credentials. Add SUPABASE_URL and SUPABASE_ANON_KEY"
+  );
+  console.error(
+    "   or NEXT_PUBLIC_SUPABASE_URL / NEXT_PUBLIC_SUPABASE_ANON_KEY in .env.local\n"
+  );
   process.exit(1);
 }
 
@@ -111,13 +107,23 @@ interface SteamGridDbGridsResponse {
   data: SteamGridDbGrid[];
 }
 
+// Local game row type (includes cover_url)
+interface GameRow {
+  id: string;
+  slug: string;
+  title: string;
+  cover_url: string | null;
+}
+
 /**
  * Search for a game on SteamGridDB by title
  */
 async function searchGame(title: string): Promise<SteamGridDbGame | null> {
   try {
     const response = await fetch(
-      `${STEAMGRIDDB_API_BASE}/search/autocomplete/${encodeURIComponent(title)}`,
+      `${STEAMGRIDDB_API_BASE}/search/autocomplete/${encodeURIComponent(
+        title
+      )}`,
       {
         headers: {
           Authorization: `Bearer ${STEAMGRIDDB_API_KEY}`,
@@ -126,7 +132,9 @@ async function searchGame(title: string): Promise<SteamGridDbGame | null> {
     );
 
     if (!response.ok) {
-      console.error(`SteamGridDB search failed for "${title}": ${response.status} ${response.statusText}`);
+      console.error(
+        `SteamGridDB search failed for "${title}": ${response.status} ${response.statusText}`
+      );
       return null;
     }
 
@@ -159,7 +167,9 @@ async function getGameGrids(gameId: number): Promise<SteamGridDbGrid | null> {
     );
 
     if (!response.ok) {
-      console.error(`SteamGridDB grids fetch failed for game ID ${gameId}: ${response.status} ${response.statusText}`);
+      console.error(
+        `SteamGridDB grids fetch failed for game ID ${gameId}: ${response.status} ${response.statusText}`
+      );
       return null;
     }
 
@@ -190,7 +200,11 @@ async function getGameGrids(gameId: number): Promise<SteamGridDbGrid | null> {
 /**
  * Fetch cover image for a single game
  */
-async function fetchCoverForGame(game: { id: string; slug: string; title: string }): Promise<string | null> {
+async function fetchCoverForGame(game: {
+  id: string;
+  slug: string;
+  title: string;
+}): Promise<string | null> {
   // Search for the game
   const gameResult = await searchGame(game.title);
   if (!gameResult) {
@@ -210,29 +224,30 @@ async function fetchCoverForGame(game: { id: string; slug: string; title: string
 }
 
 /**
- * Fetch games without cover URLs from Supabase
+ * Fetch a chunk of games from Supabase
+ * (we'll skip ones with covers in the loop).
  */
-async function fetchGamesWithoutCovers(): Promise<Array<{ id: string; slug: string; title: string }>> {
+async function fetchGamesChunk(): Promise<GameRow[]> {
   const { data, error } = await supabase
     .from("games")
     .select("id, slug, title, cover_url")
     .order("title", { ascending: true })
-    .range(4000, 4999); // 👈 FETCH UP TO 5000 ROWS
+    .range(RANGE_START, RANGE_END); // just one simple range
 
   if (error) {
     throw new Error(`Failed to fetch games: ${error.message}`);
   }
 
-  return (data || [])
-    .filter((game) => !game.cover_url || game.cover_url.trim() === "")
-    .map(({ cover_url, ...rest }) => rest);
+  return (data || []) as GameRow[];
 }
-
 
 /**
  * Update game cover URL in Supabase
  */
-async function updateGameCover(gameId: string, coverUrl: string): Promise<boolean> {
+async function updateGameCover(
+  gameId: string,
+  coverUrl: string
+): Promise<boolean> {
   const { error } = await supabase
     .from("games")
     .update({ cover_url: coverUrl })
@@ -252,10 +267,12 @@ async function updateGameCover(gameId: string, coverUrl: string): Promise<boolea
 async function main() {
   console.log("Starting SteamGridDB cover fetcher...\n");
 
-  // Fetch games without covers
-  console.log("Fetching games without cover URLs...");
-  const games = await fetchGamesWithoutCovers();
-  console.log(`Found ${games.length} games without cover URLs\n`);
+  // Fetch a chunk of games
+  console.log(
+    `Fetching games from Supabase (range ${RANGE_START}–${RANGE_END})...`
+  );
+  const games = await fetchGamesChunk();
+  console.log(`Fetched ${games.length} games\n`);
 
   if (games.length === 0) {
     console.log("No games to process. Exiting.");
@@ -264,15 +281,29 @@ async function main() {
 
   let successCount = 0;
   let failureCount = 0;
-  let skippedCount = 0;
+  let skippedAlreadyHasCover = 0;
+  let skippedNoCoverFound = 0;
 
   // Process games in batches
   for (let i = 0; i < games.length; i += BATCH_SIZE) {
     const batch = games.slice(i, i + BATCH_SIZE);
-    console.log(`Processing batch ${Math.floor(i / BATCH_SIZE) + 1} (${batch.length} games)...`);
+    console.log(
+      `Processing batch ${Math.floor(i / BATCH_SIZE) + 1} (${
+        batch.length
+      } games)...`
+    );
 
     for (const game of batch) {
       try {
+        // If the game already has a cover, skip it
+        if (game.cover_url && game.cover_url.trim() !== "") {
+          console.log(
+            `  Skipping (already has cover): ${game.title} (${game.slug})`
+          );
+          skippedAlreadyHasCover++;
+          continue;
+        }
+
         console.log(`  Searching for: ${game.title} (${game.slug})`);
 
         const coverUrl = await fetchCoverForGame(game);
@@ -280,15 +311,15 @@ async function main() {
         if (coverUrl) {
           const updated = await updateGameCover(game.id, coverUrl);
           if (updated) {
-            console.log(`    ✓ Updated: ${coverUrl}`);
+            console.log(`    ✓ Updated cover: ${coverUrl}`);
             successCount++;
           } else {
             console.log(`    ✗ Failed to update database`);
             failureCount++;
           }
         } else {
-          console.log(`    - No cover found`);
-          skippedCount++;
+          console.log(`    - No cover found on SteamGridDB`);
+          skippedNoCoverFound++;
         }
 
         // Rate limit between games
@@ -299,15 +330,21 @@ async function main() {
       }
     }
 
-    console.log(`  Batch complete. Progress: ${Math.min(i + BATCH_SIZE, games.length)}/${games.length}\n`);
+    console.log(
+      `  Batch complete. Progress: ${Math.min(
+        i + BATCH_SIZE,
+        games.length
+      )}/${games.length}\n`
+    );
   }
 
   // Summary
   console.log("\n=== Summary ===");
-  console.log(`Total games processed: ${games.length}`);
-  console.log(`Successfully updated: ${successCount}`);
-  console.log(`No cover found: ${skippedCount}`);
-  console.log(`Failed: ${failureCount}`);
+  console.log(`Total games fetched in range: ${games.length}`);
+  console.log(`Already had cover (skipped): ${skippedAlreadyHasCover}`);
+  console.log(`Successfully updated covers: ${successCount}`);
+  console.log(`No cover found on SteamGridDB: ${skippedNoCoverFound}`);
+  console.log(`Failed updates: ${failureCount}`);
   console.log("\nDone!");
 }
 
@@ -316,4 +353,3 @@ main().catch((error) => {
   console.error("Fatal error:", error);
   process.exit(1);
 });
-

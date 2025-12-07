@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Metadata } from "next";
 import { getGameBySlug, getCommunitiesByGame, getGuidesByGame, getPlayGuidesByGame, getSimilarGames, getGamePlayGuide, getGameTraits } from "@/lib/games";
 import { getPlayersByGame } from "@/lib/players";
 import { getCurrentUser } from "@/lib/supabase-server";
@@ -7,6 +8,21 @@ import GamePageClient from "@/components/game/GamePageClient";
 
 interface GamePageProps {
   params: Promise<{ slug: string }>;
+}
+
+export async function generateMetadata({ params }: GamePageProps): Promise<Metadata> {
+  const { slug } = await params;
+  const game = await getGameBySlug(slug);
+
+  if (!game) {
+    return {
+      title: "Game not found - Apoxer",
+    };
+  }
+
+  return {
+    title: `${game.title} - Apoxer`,
+  };
 }
 
 /**

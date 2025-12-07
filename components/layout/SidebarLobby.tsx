@@ -137,14 +137,14 @@ export default function SidebarLobby() {
         <div className="flex gap-2 mt-4">
           <Button
             onClick={openLobbyModal}
-            className="flex-1 bg-white/10 hover:bg-white/20 text-white text-sm"
+            className="flex-1 bg-white/10 hover:bg-white/20 text-white text-sm h-8"
           >
             Join Lobby
           </Button>
           <Button
             variant="outline"
             onClick={() => setShowLobby(false)}
-            className="px-3 border-white/10 text-white/60 hover:text-white hover:bg-white/10"
+            className="px-3 border-white/10 text-white/60 hover:text-white hover:bg-white/10 h-8"
           >
             <X className="w-4 h-4" />
           </Button>

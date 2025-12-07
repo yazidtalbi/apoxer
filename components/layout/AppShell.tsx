@@ -1,10 +1,13 @@
 "use client";
 
+import { useState } from "react";
 import { usePathname } from "next/navigation";
 import Link from "next/link";
 import { Home, Gamepad2, Users, Bell, Settings, Search } from "lucide-react";
-import SidebarLobby from "./SidebarLobby";
+import LobbySidebar from "./LobbySidebar";
+import LobbySidebarCompact from "./LobbySidebarCompact";
 import LobbyModal from "@/components/game/LobbyModal";
+import { useLobby } from "@/contexts/LobbyContext";
 
 interface AppShellProps {
   children: React.ReactNode;
@@ -12,6 +15,8 @@ interface AppShellProps {
 
 export default function AppShell({ children }: AppShellProps) {
   const pathname = usePathname();
+  const { showLobby } = useLobby();
+  const [isLobbySidebarExpanded, setIsLobbySidebarExpanded] = useState(true);
 
   const navItems = [
     { href: "/", icon: Home, label: "Home" },
@@ -51,15 +56,17 @@ export default function AppShell({ children }: AppShellProps) {
             </div>
           </div>
 
-          {/* User Avatar */}
-          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-500 flex-shrink-0 shadow-md" />
+          {/* Right Side - User Avatar */}
+          <div className="flex items-center gap-3 flex-shrink-0">
+            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-500 flex-shrink-0 shadow-md" />
+          </div>
         </div>
       </header>
 
-      {/* Main Content Area - Sidebar + Content */}
+      {/* Main Content Area - Left Sidebar - Lobby Sidebar - Content */}
       <div className="flex flex-1 overflow-hidden px-2 sm:px-3 pb-2 sm:pb-3 gap-2 sm:gap-3">
-        {/* Sidebar - Hidden on mobile, visible on sm+ */}
-        <aside className="hidden sm:flex flex-col w-[300px] bg-[#121212] rounded-2xl flex-shrink-0">
+        {/* Primary Sidebar - Icon only */}
+        <aside className="hidden sm:flex flex-col w-16 bg-[#121212] rounded-2xl flex-shrink-0">
           {/* Top Group */}
           <div className="flex flex-col py-6 px-4 gap-6">
             {/* Navigation Items */}
@@ -71,39 +78,52 @@ export default function AppShell({ children }: AppShellProps) {
                   <Link
                     key={item.href}
                     href={item.href}
-                    className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors ${
+                    title={item.label}
+                    className={`flex items-center justify-center px-3 py-2.5 rounded-lg transition-colors ${
                       active
                         ? "bg-[#0E0E0E] text-white shadow-sm"
                         : "text-white/60 hover:text-white hover:bg-white/5"
                     }`}
                   >
                     <Icon className="w-5 h-5 flex-shrink-0" />
-                    <span className="font-medium text-sm">{item.label}</span>
                   </Link>
                 );
               })}
             </nav>
           </div>
 
-          {/* Lobby Info */}
-          <SidebarLobby />
+          {/* Lobby Compact Section */}
+          {showLobby && (
+            <>
+              {/* Horizontal Separator */}
+              <div className="border-t border-white/10 mx-4"></div>
+              <LobbySidebarCompact onExpand={() => setIsLobbySidebarExpanded(true)} />
+            </>
+          )}
 
           {/* Bottom Group */}
           <div className="mt-auto flex flex-col gap-1 px-4 pb-4">
             <button
-              className="flex items-center gap-3 px-3 py-2.5 rounded-lg bg-white/5 hover:bg-white/10 text-white/60 hover:text-white transition-colors"
+              title="Notifications"
+              className="flex items-center justify-center px-3 py-2.5 rounded-lg bg-white/5 hover:bg-white/10 text-white/60 hover:text-white transition-colors"
             >
               <Bell className="w-5 h-5 flex-shrink-0" />
-              <span className="font-medium text-sm">Notifications</span>
             </button>
             <button
-              className="flex items-center gap-3 px-3 py-2.5 rounded-lg bg-white/5 hover:bg-white/10 text-white/60 hover:text-white transition-colors"
+              title="Settings"
+              className="flex items-center justify-center px-3 py-2.5 rounded-lg bg-white/5 hover:bg-white/10 text-white/60 hover:text-white transition-colors"
             >
               <Settings className="w-5 h-5 flex-shrink-0" />
-              <span className="font-medium text-sm">Settings</span>
             </button>
           </div>
         </aside>
+
+        {/* Secondary Sidebar - Lobby with players (next to left sidebar, when lobby is active and expanded) */}
+        {showLobby && isLobbySidebarExpanded && (
+          <aside className="hidden lg:flex flex-col w-[300px] bg-[#121212] rounded-2xl flex-shrink-0 transition-all duration-300">
+            <LobbySidebar onCollapse={() => setIsLobbySidebarExpanded(false)} />
+          </aside>
+        )}
 
         {/* Main Content */}
         <div className="flex-1 flex flex-col min-w-0">

@@ -28,11 +28,10 @@
 
 import fs from "fs/promises";
 import dotenv from "dotenv";
+import { createClient } from "@supabase/supabase-js";
 
 dotenv.config({ path: ".env.local" });
 dotenv.config();
-
-import { createClient } from "@supabase/supabase-js";
 
 const SUPABASE_URL =
   process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -70,8 +69,14 @@ function normalizePlatforms(p?: string | null): string[] {
 
   if (v.includes("windows") || v.includes("pc")) return ["pc"];
   if (v.includes("xbox")) return ["xbox"];
-  if (v.includes("playstation") || v.includes("ps1") || v.includes("ps2") ||
-      v.includes("ps3") || v.includes("ps4") || v.includes("ps5")) {
+  if (
+    v.includes("playstation") ||
+    v.includes("ps1") ||
+    v.includes("ps2") ||
+    v.includes("ps3") ||
+    v.includes("ps4") ||
+    v.includes("ps5")
+  ) {
     return ["playstation"];
   }
   if (v.includes("switch")) return ["switch"];
@@ -81,7 +86,9 @@ function normalizePlatforms(p?: string | null): string[] {
 }
 
 // Clean up Year → integer or null
-function normalizeYear(y: number | string | null | undefined): number | null {
+function normalizeYear(
+  y: number | string | null | undefined
+): number | null {
   if (y === null || y === undefined) return null;
 
   if (typeof y === "number") {
@@ -101,6 +108,40 @@ function normalizeYear(y: number | string | null | undefined): number | null {
   return null;
 }
 
+/**
+ * Load all existing slugs from the `games` table to avoid inserting duplicates.
+ */
+async function fetchExistingSlugs(): Promise<Set<string>> {
+  const slugs = new Set<string>();
+
+  let from = 0;
+  const batchSize = 1000;
+
+  while (true) {
+    const { data, error } = await supabase
+      .from("games")
+      .select("slug")
+      .range(from, from + batchSize - 1);
+
+    if (error) {
+      console.error("Error loading existing slugs:", error);
+      break;
+    }
+
+    if (!data || data.length === 0) {
+      break;
+    }
+
+    for (const row of data) {
+      if (row.slug) slugs.add(row.slug);
+    }
+
+    from += batchSize;
+  }
+
+  return slugs;
+}
+
 async function main() {
   console.log("Reading data/windows-games.json ...");
 
@@ -110,18 +151,41 @@ async function main() {
 
   console.log(`Loaded ${rawGames.length} entries from JSON.`);
 
-  // de-dupe by slug (some titles might repeat)
+  console.log("Fetching existing slugs from Supabase...");
+  const existingSlugs = await fetchExistingSlugs();
+  console.log(`Found ${existingSlugs.size} existing games in DB.`);
+
+  // de-dupe by slug (inside this JSON batch)
   const bySlug = new Map<string, any>();
 
+  let skippedExisting = 0;
+  let skippedEmpty = 0;
+
   for (const g of rawGames) {
-    if (!g.Game) continue;
+    if (!g.Game) {
+      skippedEmpty++;
+      continue;
+    }
 
     const title = g.Game.trim();
-    if (!title) continue;
+    if (!title) {
+      skippedEmpty++;
+      continue;
+    }
 
     const slug = slugify(title);
-    if (!slug) continue;
+    if (!slug) {
+      skippedEmpty++;
+      continue;
+    }
 
+    // Skip if already in DB
+    if (existingSlugs.has(slug)) {
+      skippedExisting++;
+      continue;
+    }
+
+    // Skip duplicates inside this JSON file
     if (bySlug.has(slug)) continue; // keep first occurrence
 
     const platforms = normalizePlatforms(g.Platform ?? null);
@@ -138,7 +202,7 @@ async function main() {
       hero_url: null,
 
       // arrays
-      platforms,             // 👈 this goes into your text[] column
+      platforms, // text[]
       genres: [] as string[],
       tags: [] as string[],
 
@@ -157,11 +221,18 @@ async function main() {
   }
 
   const payload = Array.from(bySlug.values());
-  console.log(`Prepared ${payload.length} unique games for insert.`);
+  console.log(`Prepared ${payload.length} unique NEW games for insert.`);
+  console.log(`Skipped ${skippedExisting} already-existing games.`);
+  console.log(`Skipped ${skippedEmpty} invalid/empty entries.`);
 
   // Debug logs
   console.log("rawGames length:", rawGames.length);
-  console.log("unique slugs (payload length):", payload.length);
+  console.log("unique slugs in this batch (payload length):", payload.length);
+
+  if (payload.length === 0) {
+    console.log("No new games to insert. Exiting.");
+    process.exit(0);
+  }
 
   const chunkSize = 500;
   let inserted = 0;
@@ -169,21 +240,19 @@ async function main() {
   for (let i = 0; i < payload.length; i += chunkSize) {
     const chunk = payload.slice(i, i + chunkSize);
 
-    const { error } = await supabase.from("games").upsert(chunk, {
-      onConflict: "slug", // use slug as unique key
-    });
+    const { error } = await supabase.from("games").insert(chunk);
 
     if (error) {
-      console.error("Supabase upsert error on chunk starting at index", i);
+      console.error("Supabase insert error on chunk starting at index", i);
       console.error(JSON.stringify(error, null, 2));
       process.exit(1);
     }
 
     inserted += chunk.length;
-    console.log(`✓ Inserted/updated ${inserted}/${payload.length} games`);
+    console.log(`✓ Inserted ${inserted}/${payload.length} new games`);
   }
 
-  console.log("Done seeding from Windows JSON.");
+  console.log("Done seeding from Windows JSON (new games only).");
 }
 
 main().catch((err) => {

@@ -14,6 +14,11 @@ const nextConfig: NextConfig = {
         hostname: "images.pexels.com",
         pathname: "/**",
       },
+      {
+        protocol: "https",
+        hostname: "images.igdb.com",
+        pathname: "/**",
+      },
     ],
   },
 };

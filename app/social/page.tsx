@@ -1,38 +1,112 @@
-import { getSuggestedPlayers } from "@/lib/players";
-import PlayerCard from "@/components/PlayerCard";
+import { getCurrentUser } from "@/lib/supabase-server";
+import { getUserGames } from "@/lib/user-games";
+import SocialFeed from "@/components/social/SocialFeed";
+
+interface Activity {
+  id: string;
+  type: "game_added" | "matchmaking_started" | "status_updated";
+  user: {
+    id: string;
+    username: string;
+    avatarUrl?: string;
+  };
+  game?: {
+    id: string;
+    title: string;
+    slug: string;
+    coverUrl: string;
+  };
+  timestamp: string;
+  platform?: string;
+}
+
+/**
+ * Fetches activity feed for friends/following
+ * For now, returns dummy data - can be replaced with real database queries
+ */
+async function getActivityFeed(userId?: string): Promise<Activity[]> {
+  // TODO: Replace with actual database query
+  // Query should fetch:
+  // - Friends/following who added games
+  // - Friends/following who started matchmaking
+  // - Friends/following who updated their status
+  // Order by timestamp descending
+
+  // Dummy data for now
+  return [
+    {
+      id: "1",
+      type: "game_added",
+      user: {
+        id: "user1",
+        username: "gamer123",
+        avatarUrl: undefined,
+      },
+      game: {
+        id: "game1",
+        title: "Apex Legends",
+        slug: "apex-legends",
+        coverUrl: "https://images.igdb.com/igdb/image/upload/t_cover_big/co49x5.jpg",
+      },
+      timestamp: new Date(Date.now() - 30 * 60 * 1000).toISOString(), // 30 minutes ago
+    },
+    {
+      id: "2",
+      type: "matchmaking_started",
+      user: {
+        id: "user2",
+        username: "proplayer",
+        avatarUrl: undefined,
+      },
+      game: {
+        id: "game2",
+        title: "Valorant",
+        slug: "valorant",
+        coverUrl: "https://images.igdb.com/igdb/image/upload/t_cover_big/co49x5.jpg",
+      },
+      timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(), // 2 hours ago
+      platform: "PC",
+    },
+    {
+      id: "3",
+      type: "status_updated",
+      user: {
+        id: "user3",
+        username: "casualgamer",
+        avatarUrl: undefined,
+      },
+      game: {
+        id: "game3",
+        title: "Fortnite",
+        slug: "fortnite",
+        coverUrl: "https://images.igdb.com/igdb/image/upload/t_cover_big/co49x5.jpg",
+      },
+      timestamp: new Date(Date.now() - 5 * 60 * 60 * 1000).toISOString(), // 5 hours ago
+      platform: "PlayStation",
+    },
+  ];
+}
 
 export default async function SocialPage() {
-  const suggestedPlayers = await getSuggestedPlayers(20);
+  const user = await getCurrentUser();
+
+  // Fetch user's games if logged in
+  let userGames = [];
+  if (user) {
+    try {
+      userGames = await getUserGames(user.id);
+    } catch (error) {
+      console.error("Error fetching user games:", error);
+    }
+  }
+
+  // Fetch activity feed
+  const activities = await getActivityFeed(user?.id);
 
   return (
     <div className="py-8">
-      <h1 className="text-3xl font-semibold text-white mb-8">Social</h1>
-
-      {/* Suggested Players Section */}
-      <section className="mb-12">
-        <h2 className="text-xl font-semibold text-white mb-4">Suggested players</h2>
-        {suggestedPlayers.length === 0 ? (
-          <div className="bg-[#0E0E0E] border border-white/10 rounded p-4">
-            <p className="text-white/60 text-sm">No players found.</p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {suggestedPlayers.map((player) => (
-              <PlayerCard key={player.id} player={player} />
-            ))}
-          </div>
-        )}
-      </section>
-
-      {/* Recently Active Section */}
-      <section>
-        <h2 className="text-xl font-semibold text-white mb-4">Recently active in your games</h2>
-        <div className="bg-[#0E0E0E] border border-white/10 rounded p-6">
-          <p className="text-white/60 text-sm">
-            This section will show players who have been recently active in games you play.
-          </p>
-        </div>
-      </section>
+      <h1 className="text-3xl font-semibold text-white mb-8">Social Feed</h1>
+      <SocialFeed initialActivities={activities} userGames={userGames} />
     </div>
   );
 }
